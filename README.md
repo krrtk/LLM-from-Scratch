@@ -9,3 +9,9 @@ Pre train LLM on unlabeled data
 
 Stage 3->
 Fine-tuning LLM for calssification tasks or personal assistant
+
+Progress so far:
+
+Stage 1:
+-tokenization
+-Byte Pair Encoding
