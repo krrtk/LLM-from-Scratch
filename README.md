@@ -14,4 +14,7 @@ Progress so far:
 
 Stage 1:
 -tokenization
+
 -Byte Pair Encoding
+
+-Input-Target Pairs
