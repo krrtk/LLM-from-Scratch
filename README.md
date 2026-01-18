@@ -18,3 +18,7 @@ Stage 1:
 -Byte Pair Encoding
 
 -Input-Target Pairs
+
+-Vector Embeddings
+
+-Position Embeddings
