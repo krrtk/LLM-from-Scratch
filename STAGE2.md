@@ -3,7 +3,7 @@
 
 ---
 
-## 📖 Overview
+## Overview
 
 This project implements the **attention mechanism** of a Large Language Model step by step — starting from a simple dot-product attention with no trainable weights, all the way to a full **Multi-Head Attention** module.
 
@@ -11,7 +11,7 @@ This project implements the **attention mechanism** of a Large Language Model st
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 ```
 Word Embeddings (3D vectors)
@@ -31,7 +31,7 @@ Word Embeddings (3D vectors)
 
 ---
 
-## 🔬 Concepts Covered
+##  Concepts Covered
 
 ### 1. Simple Self-Attention *(No Trainable Weights)*
 
@@ -137,7 +137,7 @@ queries = queries.view(b, num_tokens, self.num_heads, self.head_dim).transpose(1
 
 ---
 
-## 📦 Requirements
+## Requirements
 
 ```bash
 pip install torch matplotlib
@@ -145,7 +145,7 @@ pip install torch matplotlib
 
 ---
 
-## 🏃 Quick Usage
+## Quick Usage
 
 ```python
 import torch
@@ -166,7 +166,7 @@ print(context_vecs.shape)  # → torch.Size([2, 6, 2])
 
 ---
 
-## 📊 Scale Reference
+## Scale Reference
 
 | Model | Heads | Embedding Dim | Parameters |
 |-------|-------|---------------|------------|
@@ -176,10 +176,8 @@ print(context_vecs.shape)  # → torch.Size([2, 6, 2])
 
 ---
 
-## 🔮 Still In Progress
+## Still In Progress
 
-- [ ] Complete `CausalAttention` forward pass
-- [ ] Complete `MultiHeadAttention` forward pass
 - [ ] Feed-forward layers & layer normalization
 - [ ] Full GPT block (Attention + FFN + residuals)
 - [ ] Training loop
