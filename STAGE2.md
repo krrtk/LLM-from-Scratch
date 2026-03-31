@@ -1,4 +1,4 @@
-# 🧠 Attention Mechanism — From Scratch
+# Attention Mechanism — From Scratch
 ### Implementing Self-Attention, Causal Attention & Multi-Head Attention using PyTorch
 
 ---
