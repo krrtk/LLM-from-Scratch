@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apex LLM Engine — First-Principles GPT-2</title>
+<meta name="description" content="Apex LLM Engine: a professional GPT-2 visualiser and fine-tuning suite built from scratch in PyTorch.">
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & tokens ─────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#09090b;--surf:#111113;--surf2:#16161a;
+  --b1:#1f1f23;--b2:#2a2a30;--b3:#3f3f46;
+  --tx:#e4e4e7;--muted:#71717a;--subtle:#52525b;
+  --acc:#6366f1;--acc-h:#818cf8;--acc-dim:rgba(99,102,241,.13);--acc-glow:rgba(99,102,241,.25);
+  --green:#22c55e;--green-dim:rgba(34,197,94,.1);
+  --red:#ef4444;--amber:#f59e0b;
+  --r:10px;--r-sm:6px;--sidebar:272px;
+  --trans:.2s ease;
+}
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);overflow:hidden;font-size:14px;-webkit-font-smoothing:antialiased;}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px;}
+::-webkit-scrollbar-thumb:hover{background:var(--b3);}
+
+/* ── Layout skeleton ────────────────────────────────────────── */
+.layout{display:flex;height:100vh;}
+.sidebar{width:var(--sidebar);min-width:var(--sidebar);background:var(--surf);border-right:1px solid var(--b1);display:flex;flex-direction:column;overflow:hidden;}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.main-body{flex:1;display:grid;grid-template-columns:1fr 330px;overflow:hidden;min-width:0;}
+.center{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--b1);}
+.right{display:flex;flex-direction:column;overflow:hidden;background:var(--surf);}
+
+/* ── Sidebar header ─────────────────────────────────────────── */
+.sb-header{padding:18px 16px 14px;border-bottom:1px solid var(--b1);position:relative;overflow:hidden;flex-shrink:0;}
+.sb-header::before{content:'';position:absolute;top:-30px;left:-30px;width:120px;height:120px;background:radial-gradient(circle,var(--acc-glow) 0%,transparent 70%);pointer-events:none;}
+.logo{display:flex;align-items:center;gap:10px;position:relative;}
+.logo-mark{width:30px;height:30px;background:linear-gradient(135deg,#fff 0%,#c7c7cc 100%);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#000;flex-shrink:0;box-shadow:0 0 0 1px rgba(255,255,255,.1);}
+.logo-text{font-size:.88rem;font-weight:700;color:#fff;line-height:1.1;letter-spacing:-.01em;}
+.logo-sub{font-size:.6rem;color:var(--muted);margin-top:2px;letter-spacing:.04em;}
+.sys-badge{display:inline-flex;align-items:center;gap:5px;background:var(--green-dim);border:1px solid rgba(34,197,94,.2);border-radius:20px;padding:3px 8px;font-size:.6rem;font-weight:600;color:var(--green);margin-top:10px;width:fit-content;}
+.pulse{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s ease infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(.8);}}
+
+/* ── Sidebar body ───────────────────────────────────────────── */
+.sb-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:0;}
+.sec-label{font-size:.58rem;font-weight:700;color:var(--subtle);text-transform:uppercase;letter-spacing:.1em;padding:14px 4px 7px;flex-shrink:0;}
+
+/* Model buttons */
+.model-list{display:flex;flex-direction:column;gap:5px;margin-bottom:2px;}
+.model-btn{width:100%;padding:9px 11px;background:var(--bg);border:1px solid var(--b1);border-radius:var(--r);color:var(--muted);font-size:.8rem;font-family:'Inter',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:space-between;transition:var(--trans);text-align:left;}
+.model-btn:hover{border-color:var(--b2);color:var(--tx);background:var(--surf2);}
+.model-btn.active{background:var(--acc-dim);border-color:var(--acc);color:var(--acc-h);}
+.model-btn.active .mdot{background:var(--green);box-shadow:0 0 6px var(--green);}
+.mdot{width:7px;height:7px;border-radius:50%;background:var(--subtle);transition:var(--trans);flex-shrink:0;}
+.model-name{display:flex;flex-direction:column;gap:1px;}
+.model-name small{font-size:.6rem;color:var(--subtle);font-weight:400;}
+
+/* Sliders */
+.slider-row{margin-bottom:9px;}
+.slider-label{display:flex;justify-content:space-between;align-items:center;font-size:.7rem;color:var(--muted);margin-bottom:5px;}
+.slider-val{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--acc-h);font-weight:500;background:var(--acc-dim);padding:1px 6px;border-radius:4px;}
+input[type=range]{width:100%;accent-color:var(--acc);height:3px;cursor:pointer;border-radius:2px;}
+
+/* Upload zone */
+.upload-zone{border:1px dashed var(--b2);border-radius:var(--r);padding:14px;text-align:center;cursor:pointer;transition:var(--trans);position:relative;background:var(--bg);}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--acc);background:var(--acc-dim);}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.up-icon{font-size:1.3rem;margin-bottom:4px;display:block;}
+.up-text{font-size:.72rem;color:var(--muted);line-height:1.5;}
+.up-filename{font-size:.7rem;color:var(--acc-h);font-family:'JetBrains Mono',monospace;word-break:break-all;}
+
+/* Buttons */
+.btn{padding:8px 14px;border-radius:8px;font-family:'Inter',sans-serif;font-size:.78rem;font-weight:600;cursor:pointer;transition:var(--trans);border:none;width:100%;margin-top:5px;display:flex;align-items:center;justify-content:center;gap:6px;}
+.btn-primary{background:#fff;color:#000;}
+.btn-primary:hover{background:#e4e4e7;}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed;}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--b1);}
+.btn-ghost:hover:not(:disabled){background:var(--surf2);color:var(--tx);border-color:var(--b2);}
+.btn-ghost:disabled{opacity:.35;cursor:not-allowed;}
+.btn-accent{background:var(--acc);color:#fff;}
+.btn-accent:hover{background:var(--acc-h);}
+
+/* Sidebar footer */
+.sb-footer{padding:10px 14px;border-top:1px solid var(--b1);flex-shrink:0;}
+.footer-text{font-size:.63rem;color:var(--subtle);line-height:1.7;}
+.footer-name{color:var(--muted);font-weight:600;}
+.footer-tag{color:var(--b3);font-family:'JetBrains Mono',monospace;font-size:.58rem;}
+
+/* ── Center panel ───────────────────────────────────────────── */
+.prompt-area{padding:18px 22px 14px;border-bottom:1px solid var(--b1);flex-shrink:0;}
+.panel-title{font-size:.6rem;font-weight:700;color:var(--subtle);text-transform:uppercase;letter-spacing:.1em;margin-bottom:9px;}
+.prompt-wrap{position:relative;}
+.prompt-input{width:100%;background:var(--bg);border:1px solid var(--b1);border-radius:var(--r);padding:11px 13px;color:var(--tx);font-family:'Inter',sans-serif;font-size:.88rem;resize:none;outline:none;transition:border-color var(--trans);line-height:1.55;min-height:72px;}
+.prompt-input:focus{border-color:var(--b2);}
+.prompt-input::placeholder{color:var(--subtle);}
+.prompt-actions{display:flex;align-items:center;justify-content:space-between;margin-top:9px;}
+.gen-meta{font-size:.7rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.btn-generate{padding:9px 18px;background:#fff;color:#000;border:none;border-radius:8px;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:var(--trans);flex-shrink:0;}
+.btn-generate:hover{background:#e4e4e7;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.3);}
+.btn-generate:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.hint{font-size:.6rem;color:var(--subtle);margin-top:3px;}
+
+/* Output area */
+.output-area{flex:1;overflow-y:auto;padding:16px 22px;}
+.output-wrapper{position:relative;}
+.output-box{background:var(--surf);border:1px solid var(--b1);border-radius:var(--r);padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.8;color:var(--tx);min-height:90px;white-space:pre-wrap;word-break:break-word;transition:border-color var(--trans);}
+.output-box:hover{border-color:var(--b2);}
+.output-ph{color:var(--subtle);font-style:italic;font-family:'Inter',sans-serif;font-size:.82rem;}
+.copy-btn{position:absolute;top:8px;right:8px;background:var(--surf2);border:1px solid var(--b2);color:var(--muted);border-radius:var(--r-sm);padding:3px 10px;font-size:.65rem;font-weight:600;cursor:pointer;opacity:0;transition:var(--trans);font-family:'Inter',sans-serif;}
+.output-wrapper:hover .copy-btn{opacity:1;}
+.copy-btn:hover{color:var(--tx);border-color:var(--b3);background:var(--b2);}
+.copy-btn.copied{color:var(--green);border-color:rgba(34,197,94,.3);}
+
+/* Cursor */
+.tw-cursor{display:inline-block;width:2px;height:14px;background:var(--acc);margin-left:2px;animation:blink 1s step-end infinite;vertical-align:middle;border-radius:1px;}
+@keyframes blink{50%{opacity:0;}}
+
+/* Viz area */
+.viz-area{border-top:1px solid var(--b1);padding:14px 22px 0;flex-shrink:0;}
+.viz-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.layer-ctl{display:none;align-items:center;gap:7px;}
+.layer-ctl.show{display:flex;}
+.layer-num{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--acc-h);font-weight:600;background:var(--acc-dim);padding:1px 7px;border-radius:4px;min-width:28px;text-align:center;}
+.empty-viz{background:var(--surf);border:1px solid var(--b1);border-radius:var(--r);height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--subtle);gap:8px;}
+.empty-icon{font-size:1.8rem;opacity:.4;}
+.empty-txt{font-size:.75rem;}
+
+/* ── Right panel ────────────────────────────────────────────── */
+.rp-top{padding:14px 15px;border-bottom:1px solid var(--b1);overflow-y:auto;flex:1;}
+.rp-bot{padding:14px 15px;flex-shrink:0;}
+.prob-ph{font-size:.73rem;color:var(--subtle);padding:6px 0;}
+
+/* Token pills */
+.pill-wrap{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;max-height:110px;overflow-y:auto;padding-right:2px;}
+.pill{background:var(--bg);border:1px solid var(--b1);border-radius:4px;padding:2px 7px;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);animation:pill-in .25s ease backwards;}
+@keyframes pill-in{from{opacity:0;transform:scale(.85);}to{opacity:1;transform:scale(1);}}
+
+/* Prob bars */
+.prob-list{display:flex;flex-direction:column;gap:6px;}
+.prob-row{display:flex;align-items:center;gap:7px;}
+.prob-tok{font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--muted);width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;}
+.prob-bar-bg{flex:1;background:var(--b1);border-radius:3px;height:4px;overflow:hidden;}
+.prob-bar-fill{height:4px;border-radius:3px;background:linear-gradient(90deg,var(--acc),var(--acc-h));transition:width .45s cubic-bezier(.4,0,.2,1);}
+.prob-pct{font-size:.63rem;color:var(--subtle);font-family:'JetBrains Mono',monospace;width:32px;text-align:right;flex-shrink:0;}
+
+/* Info grid */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.info-cell{background:var(--bg);border:1px solid var(--b1);border-radius:8px;padding:9px 11px;}
+.info-lbl{font-size:.57rem;color:var(--subtle);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;}
+.info-val{font-size:.8rem;color:var(--tx);font-weight:500;font-family:'JetBrains Mono',monospace;}
+.info-val.green{color:var(--green);}
+.info-val.accent{color:var(--acc-h);}
+.info-cell.full{grid-column:1/-1;}
+.sdot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--subtle);margin-right:5px;vertical-align:middle;transition:var(--trans);}
+.sdot.live{background:var(--green);box-shadow:0 0 5px var(--green);}
+.sdot.custom{background:var(--acc);box-shadow:0 0 5px var(--acc);}
+
+/* ── Toast ──────────────────────────────────────────────────── */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--surf);border:1px solid var(--b2);border-radius:var(--r);padding:9px 18px;font-size:.78rem;color:var(--tx);transition:.25s cubic-bezier(.4,0,.2,1);z-index:999;pointer-events:none;opacity:0;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+.toast.success{border-color:rgba(34,197,94,.4);color:var(--green);}
+.toast.error{border-color:rgba(239,68,68,.4);color:var(--red);}
+
+/* ── Spinner ────────────────────────────────────────────────── */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:13px;height:13px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;flex-shrink:0;}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="sb-header">
+      <div class="logo">
+        <div class="logo-mark">A</div>
+        <div>
+          <div class="logo-text">Apex LLM Engine</div>
+          <div class="logo-sub">First-Principles GPT-2</div>
+        </div>
+      </div>
+      <div class="sys-badge">
+        <span class="pulse"></span>System Online
+      </div>
+    </div>
+
+    <div class="sb-body">
+      <div class="sec-label">Model</div>
+      <div class="model-list">
+        <button class="model-btn active" id="btn-verdict" onclick="switchModel('The Verdict')">
+          <div class="model-name">
+            <span>The Verdict</span>
+            <small>Fine-tuned · Legal</small>
+          </div>
+          <div class="mdot" id="dot-verdict"></div>
+        </button>
+        <button class="model-btn" id="btn-lex" onclick="switchModel('Lex AI')">
+          <div class="model-name">
+            <span>Lex AI</span>
+            <small>Base weights</small>
+          </div>
+          <div class="mdot" id="dot-lex"></div>
+        </button>
+      </div>
+
+      <div class="sec-label">Generation</div>
+      <div class="slider-row">
+        <div class="slider-label">
+          <span>Max Tokens</span>
+          <span class="slider-val" id="val-tokens">25</span>
+        </div>
+        <input type="range" min="5" max="100" value="25" id="sl-tokens"
+               oninput="document.getElementById('val-tokens').textContent=this.value">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">
+          <span>Temperature</span>
+          <span class="slider-val" id="val-temp">0.80</span>
+        </div>
+        <input type="range" min="1" max="200" value="80" id="sl-temp"
+               oninput="document.getElementById('val-temp').textContent=(this.value/100).toFixed(2)">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">
+          <span>Top-K</span>
+          <span class="slider-val" id="val-topk">40</span>
+        </div>
+        <input type="range" min="1" max="100" value="40" id="sl-topk"
+               oninput="document.getElementById('val-topk').textContent=this.value">
+      </div>
+
+      <div class="sec-label">Fine-Tune Personality</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept=".pdf,.txt" onchange="onFileSelected(this)">
+        <span class="up-icon">&#8679;</span>
+        <div class="up-text" id="upload-label">Drop PDF or TXT to inject personality</div>
+      </div>
+      <button class="btn btn-ghost" id="btn-train" onclick="runFineTune()" disabled>
+        Run Fine-Tune
+      </button>
+    </div>
+
+    <div class="sb-footer">
+      <div class="footer-text">
+        <span class="footer-name">Kartik Yadav</span> &middot; Aspiring ML Engineer<br>
+        <span class="footer-tag">Raw PyTorch QK&#7488; &mdash; zero abstractions</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════════════ MAIN AREA ══════════════════════════════ -->
+  <div class="main">
+    <div class="main-body">
+
+      <!-- ──────────────── CENTER COLUMN ──────────────── -->
+      <div class="center">
+
+        <!-- Prompt -->
+        <div class="prompt-area">
+          <div class="panel-title">Prompt</div>
+          <div class="prompt-wrap">
+            <textarea class="prompt-input" id="prompt-input" rows="3"
+              placeholder="Type a prompt and press Generate…">Every effort moves you</textarea>
+          </div>
+          <div class="prompt-actions">
+            <div>
+              <div class="gen-meta" id="gen-meta">Ready</div>
+              <div class="hint">Ctrl+Enter to generate</div>
+            </div>
+            <button class="btn-generate" id="btn-generate" onclick="runGenerate()">
+              <span id="btn-text">Generate</span>
+              <span id="btn-arrow">&rarr;</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Output -->
+        <div class="output-area">
+          <div class="panel-title">Output</div>
+          <div class="output-wrapper">
+            <button class="copy-btn" id="copy-btn" onclick="copyOutput()">Copy</button>
+            <div class="output-box" id="output-box">
+              <span class="output-ph">Output will appear here&hellip;</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D Attention Landscape -->
+        <div class="viz-area">
+          <div class="viz-header">
+            <div class="panel-title" style="margin-bottom:0;">
+              Neural Attention Landscape
+              <span style="font-size:.58rem;color:var(--subtle);font-weight:400;margin-left:6px;">live · forward pass</span>
+            </div>
+            <div class="layer-ctl" id="layer-ctl">
+              <span style="font-size:.65rem;color:var(--muted);">Layer</span>
+              <span class="layer-num" id="layer-num">12</span>
+              <input type="range" min="0" max="11" value="11" id="sl-layer"
+                     style="width:72px;accent-color:var(--acc);height:3px;"
+                     oninput="onLayerChange(this.value)">
+            </div>
+          </div>
+          <div id="attn-container">
+            <div class="empty-viz">
+              <div class="empty-icon">&#9830;</div>
+              <div class="empty-txt">Generate a sequence to render the 3D landscape</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /center -->
+
+      <!-- ──────────────── RIGHT PANEL ──────────────── -->
+      <div class="right">
+
+        <!-- Token probability -->
+        <div class="rp-top">
+          <div class="panel-title">Token Candidates</div>
+          <div id="prob-container">
+            <div class="prob-ph">Generate to see next-token candidates&hellip;</div>
+          </div>
+        </div>
+
+        <!-- Model info -->
+        <div class="rp-bot">
+          <div class="panel-title" style="margin-bottom:10px;">Model Info</div>
+          <div class="info-grid">
+            <div class="info-cell">
+              <div class="info-lbl">Architecture</div>
+              <div class="info-val accent">GPT-2</div>
+            </div>
+            <div class="info-cell">
+              <div class="info-lbl">Parameters</div>
+              <div class="info-val">124M</div>
+            </div>
+            <div class="info-cell">
+              <div class="info-lbl">Layers</div>
+              <div class="info-val">12</div>
+            </div>
+            <div class="info-cell">
+              <div class="info-lbl">Att. Heads</div>
+              <div class="info-val">12</div>
+            </div>
+            <div class="info-cell">
+              <div class="info-lbl">Context</div>
+              <div class="info-val">256 tok</div>
+            </div>
+            <div class="info-cell">
+              <div class="info-lbl">Vocab</div>
+              <div class="info-val">50,257</div>
+            </div>
+            <div class="info-cell full">
+              <div class="info-lbl">Active Model</div>
+              <div class="info-val green" id="active-model-label">
+                <span class="sdot live" id="active-dot"></span>The Verdict
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /right -->
+
+    </div><!-- /main-body -->
+  </div><!-- /main -->
+
+</div><!-- /layout -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ── State ───────────────────────────────────────────────────── */
+const API = '';
+let activeModel      = 'The Verdict';
+let selectedFile     = null;
+let globalAttn       = null;   // list of 12 [T×T] matrices
+let lastFullText     = '';
+let toastTimer       = null;
+
+/* ── Utilities ───────────────────────────────────────────────── */
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function toast(msg, type=''){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.className='toast'; }, 2800);
+}
+
+function setBusy(busy){
+  const btn  = document.getElementById('btn-generate');
+  const txt  = document.getElementById('btn-text');
+  const arr  = document.getElementById('btn-arrow');
+  btn.disabled = busy;
+  txt.innerHTML = busy ? '<span class="spinner"></span>' : 'Generate';
+  arr.style.display = busy ? 'none' : '';
+}
+
+/* ── Model switching ─────────────────────────────────────────── */
+async function switchModel(name){
+  if(name === activeModel) return;
+  try{
+    const r = await fetch(API+'/switch_model',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model_name: name})
+    });
+    if(!r.ok) throw new Error(await r.text());
+    activeModel = name;
+    ['verdict','lex'].forEach(k=>{
+      const n = k==='verdict'?'The Verdict':'Lex AI';
+      document.getElementById('btn-'+k).classList.toggle('active', name===n);
+      document.getElementById('dot-'+k).style.background = name===n ? 'var(--green)' : '';
+      document.getElementById('dot-'+k).style.boxShadow  = name===n ? '0 0 6px var(--green)' : '';
+    });
+    document.getElementById('active-model-label').innerHTML =
+      '<span class="sdot live" id="active-dot"></span>' + esc(name);
+    toast('Loaded '+name,'success');
+  } catch(e){ toast('Switch failed: '+e.message,'error'); }
+}
+
+/* ── Generation ──────────────────────────────────────────────── */
+async function runGenerate(){
+  const prompt = document.getElementById('prompt-input').value.trim();
+  if(!prompt) return;
+
+  setBusy(true);
+  document.getElementById('gen-meta').textContent = 'Generating…';
+  document.getElementById('output-box').innerHTML = '<span class="output-ph">Thinking<span class="tw-cursor"></span></span>';
+
+  const params = {
+    prompt,
+    max_new_tokens: parseInt(document.getElementById('sl-tokens').value),
+    temperature:    parseFloat(document.getElementById('sl-temp').value)/100,
+    top_k:          parseInt(document.getElementById('sl-topk').value),
+  };
+
+  try{
+    const r = await fetch(API+'/generate',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(params)
+    });
+    if(!r.ok){
+      const err = await r.json().catch(()=>({error:'Server error'}));
+      throw new Error(err.error || 'Unknown error');
+    }
+    const data = await r.json();
+
+    lastFullText = data.generated_text;
+    await simulateStreaming(prompt, data.generated_text, 'output-box');
+
+    document.getElementById('gen-meta').textContent =
+      data.total_tokens + ' tokens · ' + params.temperature.toFixed(2) + ' temp · top-' + params.top_k;
+
+    renderTokenProbs(data.top5_probs, data.token_breakdown);
+
+    if(data.attn_weights && data.attn_weights.length){
+      globalAttn = data.attn_weights;
+      const maxL = globalAttn.length - 1;
+      const sl   = document.getElementById('sl-layer');
+      sl.max   = maxL; sl.value = maxL;
+      document.getElementById('layer-num').textContent = maxL + 1;
+      document.getElementById('layer-ctl').classList.add('show');
+      renderAttention(globalAttn[maxL]);
+    }
+  } catch(e){
+    document.getElementById('output-box').innerHTML =
+      '<span style="color:var(--red);">&#9888; Error: '+esc(e.message)+'</span>';
+    document.getElementById('gen-meta').textContent = 'Error';
+    toast(e.message,'error');
+  } finally{ setBusy(false); }
+}
+
+/* ── Typewriter streaming ────────────────────────────────────── */
+async function simulateStreaming(prompt, fullText, elId){
+  const el = document.getElementById(elId);
+  const genPart = fullText.startsWith(prompt) ? fullText.slice(prompt.length) : fullText;
+  const promptPart = fullText.startsWith(prompt) ? prompt : '';
+  const promptHtml = promptPart ? `<span style="color:var(--muted);">${esc(promptPart)}</span>` : '';
+
+  el.innerHTML = promptHtml + '<span id="tw-live" style="color:var(--tx);font-weight:500;"></span><span class="tw-cursor"></span>';
+  const live = document.getElementById('tw-live');
+
+  // Token-by-token: split generated part into ~word chunks for smooth reveal
+  const words = genPart.split(/(?<=\s)/);
+  let built = '';
+  for(const word of words){
+    built += word;
+    live.textContent = built;
+    el.parentNode.scrollTop = el.parentNode.scrollHeight;
+    await new Promise(res => setTimeout(res, 28 + Math.random()*22));
+  }
+
+  // Finalise: remove cursor
+  live.textContent = genPart;
+  const cursor = el.querySelector('.tw-cursor');
+  if(cursor) el.removeChild(cursor);
+}
+
+/* ── Token probability panel ─────────────────────────────────── */
+function renderTokenProbs(top5, breakdown){
+  const c = document.getElementById('prob-container');
+  if(!top5 || !top5.length){ c.innerHTML = '<div class="prob-ph">No probability data.</div>'; return; }
+
+  let html = '';
+
+  // Pill row — generated tokens
+  if(breakdown && breakdown.length){
+    html += '<div style="margin-bottom:11px;">';
+    html += '<div class="panel-title" style="margin-bottom:6px;">Generated Tokens</div>';
+    html += '<div class="pill-wrap">';
+    breakdown.forEach((t,i)=>{
+      html += `<span class="pill" style="animation-delay:${i*25}ms">${esc(t)}</span>`;
+    });
+    html += '</div></div>';
+  }
+
+  // Top-5 bar chart
+  html += '<div class="panel-title" style="margin-bottom:8px;">Top Candidates · last step</div>';
+  html += '<div class="prob-list">';
+  const maxP = Math.max(...top5.map(e=>e.probability));
+  for(const e of top5){
+    const pct  = (e.probability*100).toFixed(1);
+    const barW = maxP > 0 ? Math.round((e.probability/maxP)*100) : 0;
+    html += `<div class="prob-row">
+      <div class="prob-tok" title="${esc(e.token)}">"${esc(e.token)}"</div>
+      <div class="prob-bar-bg"><div class="prob-bar-fill" style="width:${barW}%"></div></div>
+      <div class="prob-pct">${pct}%</div>
+    </div>`;
+  }
+  html += '</div>';
+  c.innerHTML = html;
+}
+
+/* ── 3D Attention Landscape ──────────────────────────────────── */
+function renderAttention(matrix){
+  const container = document.getElementById('attn-container');
+  container.innerHTML = '<div id="attn-plot" style="height:250px;border-radius:var(--r);overflow:hidden;"></div>';
+
+  const colorscale = [[0,'#09090b'],[0.25,'#1e1b4b'],[0.55,'#3730a3'],[0.8,'#4f46e5'],[1,'#e0e7ff']];
+  const trace = [{
+    type:'surface', z:matrix,
+    colorscale, showscale:false,
+    lighting:{ambient:.8, diffuse:.9, specular:.15},
+    contours:{z:{show:false}},
+  }];
+  const layout = {
+    margin:{l:0,r:0,b:0,t:0},
+    paper_bgcolor:'rgba(0,0,0,0)',
+    scene:{
+      bgcolor:'#09090b',
+      xaxis:{visible:false,backgroundcolor:'#09090b',showbackground:true,gridcolor:'#1f1f23'},
+      yaxis:{visible:false,backgroundcolor:'#09090b',showbackground:true,gridcolor:'#1f1f23'},
+      zaxis:{visible:false,backgroundcolor:'#09090b',showbackground:true,gridcolor:'#1f1f23'},
+      camera:{eye:{x:1.6,y:1.6,z:1.1}},
+      aspectratio:{x:1,y:1,z:.55},
+    },
+  };
+  Plotly.newPlot('attn-plot', trace, layout, {responsive:true, displayModeBar:false});
+}
+
+function onLayerChange(val){
+  document.getElementById('layer-num').textContent = parseInt(val)+1;
+  if(globalAttn && globalAttn[val]) renderAttention(globalAttn[val]);
+}
+
+/* ── Fine-tune ───────────────────────────────────────────────── */
+function onFileSelected(input){
+  selectedFile = input.files[0] || null;
+  const label = document.getElementById('upload-label');
+  if(selectedFile){
+    label.innerHTML = '<span class="up-filename">&#10003; '+esc(selectedFile.name)+'</span>';
+  } else {
+    label.innerHTML = 'Drop PDF or TXT to inject personality';
+  }
+  document.getElementById('btn-train').disabled = !selectedFile;
+}
+
+async function runFineTune(){
+  if(!selectedFile) return;
+  const btn = document.getElementById('btn-train');
+  btn.disabled = true; btn.textContent = 'Training…';
+  try{
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    fd.append('num_epochs','5');
+    const r = await fetch(API+'/fine-tune',{method:'POST',body:fd});
+    if(!r.ok) throw new Error(await r.text());
+
+    // Clear sidebar model selections
+    document.getElementById('btn-verdict').classList.remove('active');
+    document.getElementById('btn-lex').classList.remove('active');
+    ['verdict','lex'].forEach(k=>{
+      document.getElementById('dot-'+k).style.background='';
+      document.getElementById('dot-'+k).style.boxShadow='';
+    });
+
+    // Purple "Custom" banner
+    const customName = selectedFile.name.replace(/\.(pdf|txt)$/i,'');
+    activeModel = 'Custom: '+customName;
+    document.getElementById('active-model-label').innerHTML =
+      '<span class="sdot custom" id="active-dot"></span>Custom: '+esc(customName);
+
+    // Reset file input
+    document.getElementById('file-input').value = '';
+    document.getElementById('upload-label').innerHTML = 'Drop PDF or TXT to inject personality';
+    selectedFile = null;
+    toast('Fine-tune complete! Model: Custom: '+customName,'success');
+  } catch(e){ toast('Fine-tune failed: '+e.message,'error'); }
+  finally{ btn.disabled = false; btn.textContent = 'Run Fine-Tune'; }
+}
+
+/* ── Copy button ─────────────────────────────────────────────── */
+function copyOutput(){
+  if(!lastFullText) return;
+  navigator.clipboard.writeText(lastFullText).then(()=>{
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('copied'); }, 1800);
+    toast('Copied to clipboard!','success');
+  });
+}
+
+/* ── Keyboard shortcuts ──────────────────────────────────────── */
+document.getElementById('prompt-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && (e.ctrlKey||e.metaKey)) runGenerate();
+});
+</script>
+</body>
+</html>
